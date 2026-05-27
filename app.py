@@ -1,12 +1,12 @@
+"""
+Web UI 视图模块
+基于 Streamlit 构建的双端交互界面，负责状态保持 (Session State)、
+PDF 文档解析、数据可视化 (Echarts) 以及多模态文件导出。
+"""
+
 import streamlit as st
 import PyPDF2
 from streamlit_echarts import st_echarts
-from core_engine import (
-    generate_student_profile,
-    generate_student_profile_stream,
-    parse_profile_json,
-    generate_learning_plan_stream
-)
 import io
 import pandas as pd
 import json
@@ -15,8 +15,21 @@ from docx import Document
 from docx.shared import Pt
 from docx.oxml.ns import qn
 
+# 引入核心业务逻辑
+from core_engine import (
+    generate_student_profile,
+    generate_student_profile_stream,
+    parse_profile_json,
+    generate_learning_plan_stream
+)
+
+
+# ==========================================
+# 工具函数定义区 (文件导出与处理)
+# ==========================================
 
 def set_run_font(run, font_name="Microsoft YaHei", size_pt=11, bold=False):
+    """设置 Word 文档输出的中文字体及格式"""
     run.font.name = font_name
     run.font.size = Pt(size_pt)
     run.bold = bold
@@ -26,6 +39,7 @@ def set_run_font(run, font_name="Microsoft YaHei", size_pt=11, bold=False):
 
 
 def create_excel_download(profile_data):
+    """将 JSON 格式的能力画像打包转化为 Excel 数据流"""
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine="openpyxl") as writer:
         df_basic = pd.DataFrame([
@@ -54,6 +68,7 @@ def create_excel_download(profile_data):
 
 
 def create_word_download(markdown_text):
+    """将 Markdown 格式的学习计划渲染为标准化 Word 数据流"""
     doc = Document()
     p_title = doc.add_paragraph()
     run_title = p_title.add_run("定制化成长路径规划与周任务")
@@ -95,6 +110,10 @@ def create_word_download(markdown_text):
 
 
 def extract_text_from_pdf(uploaded_file):
+    """
+    解析上传的 PDF 文件。
+    加入空文本与扫描件的拦截机制 (容错处理)。
+    """
     try:
         reader = PyPDF2.PdfReader(uploaded_file)
         text = ""
@@ -102,35 +121,40 @@ def extract_text_from_pdf(uploaded_file):
             page_text = page.extract_text()
             if page_text:
                 text += page_text + "\n"
+
+        # 防御机制：如果提取文本过短，判定为图片扫描件
+        if len(text.strip()) < 50:
+            return "ERROR_SCANNED_PDF"
         return text
     except Exception as e:
-        return ""
+        return "ERROR_PARSING_FAILED"
 
 
 def load_job_models():
+    """读取本地企业岗位 JSON 数据库，若不存在则提供默认托底数据"""
     db_path = os.path.join("data", "job_models.json")
     try:
         with open(db_path, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception:
         return {
-            "默认前端开发": "岗位名称：初级前端开发\n能力四维要求：\n1. 前端基础\n2. 框架应用\n3. 工程化\n4. 计算机基础"}
+            "默认岗位开发": "岗位名称：初级后端开发\n能力四维要求：\n1. 算法与数据结构\n2. 数据库设计\n3. 架构能力\n4. 计算机网络"}
 
 
+# ==========================================
+# 核心页面结构初始化
+# ==========================================
 st.set_page_config(page_title="AI 智能人才培养与精准就业平台", layout="wide")
 
-# ==========================================
-# 初始化全局会话记忆 (新增了简历文本的记忆)
-# ==========================================
+# 初始化全局会话记忆 (Session State)
 if "profile_data" not in st.session_state:
     st.session_state.profile_data = None
 if "learning_plan_md" not in st.session_state:
     st.session_state.learning_plan_md = None
 if "batch_talents_df" not in st.session_state:
     st.session_state.batch_talents_df = None
-# 新增：用于长久保留解析出来的简历文本和文件名，防止来回切换时丢失
 if "resume_text" not in st.session_state:
-    st.session_state.resume_text = "姓名：李四\n专业：软件工程\n技能：学过C语言 and 数据结构，写过一个图书管理系统控制台程序，对前端完全不懂。"
+    st.session_state.resume_text = "姓名：李四\n专业：软件工程\n技能：学过C语言，对前端完全不懂。"
 if "uploaded_file_name" not in st.session_state:
     st.session_state.uploaded_file_name = None
 
@@ -146,7 +170,7 @@ job_db = load_job_models()
 job_options = list(job_db.keys())
 
 # ==========================================
-# 模块一：企业端
+# 路由跳转一：企业端 (B端) 视图逻辑
 # ==========================================
 if system_role == "企业端 (人才库与岗位管理)":
     st.title("企业人才智能管理门户")
@@ -155,13 +179,12 @@ if system_role == "企业端 (人才库与岗位管理)":
 
     with tab1:
         st.subheader("企业真实岗位模型管理")
-        st.info("在此模块，HR 可维护企业的真实四维用人标准，这些标准将作为学生诊断的基准尺。")
+        st.info("在此模块，HR 可维护企业的真实用人标准，这些标准将作为大模型智能匹配的基准尺。")
         st.json(job_db)
 
-        # 新增功能区
         with st.expander("新增岗位模型"):
             new_job_name = st.text_input("岗位名称")
-            new_job_desc = st.text_area("四维能力要求", value="岗位名称：\n能力四维要求：\n1. \n2. \n3. \n4. ")
+            new_job_desc = st.text_area("能力要求与技能点", value="岗位名称：\n核心要求：\n1. \n2. \n3. \n4. ")
             if st.button("保存到企业岗位库"):
                 if not new_job_name.strip() or not new_job_desc.strip():
                     st.warning("岗位名称和能力要求不能为空！")
@@ -176,7 +199,6 @@ if system_role == "企业端 (人才库与岗位管理)":
                     except Exception as e:
                         st.error(f"保存数据库失败，请检查文件权限: {e}")
 
-        # 删除功能区
         with st.expander("删除岗位模型"):
             if not job_db:
                 st.info("当前企业岗位库为空。")
@@ -185,16 +207,11 @@ if system_role == "企业端 (人才库与岗位管理)":
                 st.warning("注意：删除后该岗位标准将永久移除，且双端同步失效。")
                 if st.button("确认删除该岗位"):
                     if job_to_delete in job_db:
-                        # 1. 从内存字典中剔除该岗位
                         del job_db[job_to_delete]
-
-                        # 2. 将剔除后的新字典重新覆盖写入 JSON 文件
                         db_path = os.path.join("data", "job_models.json")
                         try:
                             with open(db_path, "w", encoding="utf-8") as f:
                                 json.dump(job_db, f, ensure_ascii=False, indent=4)
-
-                            # 3. 瞬间刷新页面，实现全局状态同步
                             st.success(f"岗位【{job_to_delete}】已成功删除！")
                             st.rerun()
                         except Exception as e:
@@ -216,7 +233,6 @@ if system_role == "企业端 (人才库与岗位管理)":
             else:
                 job_text = job_db[selected_job]
                 results = []
-
                 progress_bar = st.progress(0)
                 status_text = st.empty()
                 total_files = len(uploaded_resumes)
@@ -224,6 +240,10 @@ if system_role == "企业端 (人才库与岗位管理)":
                 for i, file in enumerate(uploaded_resumes):
                     status_text.text(f"正在深度解析 AI 画像: {file.name} ({i + 1}/{total_files})")
                     resume_text = extract_text_from_pdf(file)
+
+                    if resume_text == "ERROR_SCANNED_PDF":
+                        st.warning(f"文件 {file.name} 为扫描件，已跳过。")
+                        continue
 
                     if resume_text.strip():
                         profile = generate_student_profile(resume_text, job_text)
@@ -273,8 +293,9 @@ if system_role == "企业端 (人才库与岗位管理)":
         if st.button("提交反馈并反哺大模型"):
             st.success("反馈已记录！系统已将实际表现与入职前 AI 画像进行比对，模型权重已自动微调。")
 
+
 # ==========================================
-# 模块二：学生端
+# 路由跳转二：学生端 (C端) 视图逻辑
 # ==========================================
 elif system_role == "学生端 (个人成长诊断)":
 
@@ -282,23 +303,24 @@ elif system_role == "学生端 (个人成长诊断)":
 
     with st.sidebar:
         st.header("输入数据")
-
         uploaded_resume = st.file_uploader("请上传学生简历 (支持 .pdf 格式)", type=["pdf"])
 
-        # 核心逻辑：只在用户上传了新文件时，才去覆盖记忆库里的数据
         if uploaded_resume is not None:
             if st.session_state.uploaded_file_name != uploaded_resume.name:
                 extracted_text = extract_text_from_pdf(uploaded_resume)
-                if extracted_text.strip():
+
+                # 触发扫描件保护机制
+                if extracted_text == "ERROR_SCANNED_PDF":
+                    st.error("⚠️ 无法提取有效文本，请确保您的简历是标准的文字版 PDF，而非纯图片扫描件。")
+                    st.session_state.uploaded_file_name = uploaded_resume.name
+                elif extracted_text == "ERROR_PARSING_FAILED":
+                    st.error("⚠️ PDF 解析发生未知错误。")
+                elif extracted_text.strip():
                     st.session_state.resume_text = extracted_text
                     st.session_state.uploaded_file_name = uploaded_resume.name
                     st.success("文档解析成功，文本已自动提取。")
-                else:
-                    st.warning("未能从该 PDF 中提取到纯文本。")
 
-        # 将多行文本框的数据和 session_state 绑定
         resume_input = st.text_area("简历内容 (可手动核对与修改)", height=200, value=st.session_state.resume_text)
-        # 实时同步用户在输入框里的手动修改
         st.session_state.resume_text = resume_input
 
         st.markdown("---")
@@ -310,23 +332,20 @@ elif system_role == "学生端 (个人成长诊断)":
 
         if selected_job == "自定义岗位输入":
             job_input = st.text_area("手动输入岗位规范", height=200,
-                                     value="岗位名称：\n能力四维要求：\n1. \n2. \n3. \n4. ")
+                                     value="岗位名称：\n能力核心要求：\n1. \n2. \n3. \n4. ")
         else:
             job_input = st.text_area("当前岗位能力要求 (只读)", height=200, value=job_db[selected_job], disabled=True)
 
         analyze_btn = st.button("开始 AI 诊断")
 
-    # ------------------------------------------
-    # 居中大字号欢迎与操作引导
-    # ------------------------------------------
-
+    # 首页欢迎占位图
     if not st.session_state.profile_data and not analyze_btn:
-        # 使用 margin-top: 15vh 让文字动态下移，适配不同屏幕；去掉了底部的 br
         st.markdown(
             "<h1 style='text-align: center; color: #333; font-size: 3.5rem; margin-top: 15vh;'>欢迎使用！</h1>",
             unsafe_allow_html=True
         )
 
+    # 触发 AI 诊断流程
     if analyze_btn:
         if not resume_input or not job_input:
             st.warning("请填写完整的简历和岗位要求！")
@@ -354,29 +373,41 @@ elif system_role == "学生端 (个人成长诊断)":
                 except Exception as e:
                     status.update(label=f"系统：请求异常 {e}", state="error")
 
-    # 诊断视图展示区
+    # 结构化报表展示区
     if st.session_state.profile_data:
         profile_data = st.session_state.profile_data
 
         col_metric, col_title = st.columns([1, 4])
         with col_metric:
             match_score = profile_data.get("match_score", 0)
-            st.metric(label="岗位整体匹配度", value=f"{match_score}%")
+            # 如果触发了优雅降级（网络断开），标红显示分数为 0
+            color = "normal" if match_score > 0 else "inverse"
+            st.metric(label="岗位整体匹配度", value=f"{match_score}%", delta_color=color)
         with col_title:
             st.subheader(f"学生 {profile_data.get('name', '未知')} 的综合诊断报告")
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            scores = profile_data.get("radar_scores", {})
-            indicators = [{"name": key, "max": 100} for key in scores.keys()]
-            values = list(scores.values())
+            # ------------------------------------------
+            # 动态生成雷达图，匹配 AI 提炼的任意维度
+            # ------------------------------------------
+            radar_dict = profile_data.get("radar_scores", {})
+            dimensions = list(radar_dict.keys())
+            scores = list(radar_dict.values())
+
+            # 极致容错：如果网络崩溃或模型未按照要求输出 radar_scores
+            if not dimensions:
+                dimensions = ["未识别维度A", "未识别维度B", "未识别维度C", "未识别维度D"]
+                scores = [0, 0, 0, 0]
+
+            indicator = [{"name": str(dim), "max": 100} for dim in dimensions]
             radar_options = {
                 "tooltip": {},
-                "radar": {"indicator": indicators},
+                "radar": {"indicator": indicator},
                 "series": [{
                     "name": "能力分值",
                     "type": "radar",
-                    "data": [{"value": values, "name": "学生现状"}],
+                    "data": [{"value": scores, "name": "学生现状"}],
                     "areaStyle": {"color": "rgba(54, 162, 235, 0.2)"}
                 }]
             }
