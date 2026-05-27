@@ -389,7 +389,7 @@ elif system_role == "学生端 (个人成长诊断)":
         col1, col2 = st.columns([1, 1])
         with col1:
             # ------------------------------------------
-            # 动态生成雷达图 (PC与移动端智能双端自适应版)
+            # 动态生成雷达图 (PC与移动端智能双端自适应版 - 极致缩放)
             # ------------------------------------------
             radar_dict = profile_data.get("radar_scores", {})
             dimensions = list(radar_dict.keys())
@@ -423,13 +423,13 @@ elif system_role == "学生端 (个人成长诊断)":
                         "query": {"maxWidth": 550},  # 触发条件：手机屏幕 / 窄容器
                         "option": {
                             "radar": {
-                                "radius": "45%",  # 手机端缩小半径防止越界
+                                "radius": "38%",  # 【极致压缩】进一步缩小半径到 38%
                                 "axisName": {
-                                    "fontSize": 11,
+                                    "fontSize": 10,  # 【字号微调】字号缩小到 10px
                                     "color": "#333",
-                                    "width": 60,
+                                    "width": 55,  # 【折行收紧】强制换行宽度压得更紧
                                     "overflow": "break",
-                                    "lineHeight": 14
+                                    "lineHeight": 12
                                 }
                             }
                         }
@@ -438,11 +438,11 @@ elif system_role == "学生端 (个人成长诊断)":
                         "query": {"minWidth": 551},  # 触发条件：PC 大屏
                         "option": {
                             "radar": {
-                                "radius": "65%",  # PC端恢复饱满大图
+                                "radius": "65%",  # PC端保持饱满大图
                                 "axisName": {
-                                    "fontSize": 14,  # 恢复大号字体
+                                    "fontSize": 14,
                                     "color": "#333",
-                                    "width": 120,  # 给足文字舒展空间
+                                    "width": 120,
                                     "overflow": "break",
                                     "lineHeight": 18
                                 }
