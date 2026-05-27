@@ -389,29 +389,47 @@ elif system_role == "学生端 (个人成长诊断)":
         col1, col2 = st.columns([1, 1])
         with col1:
             # ------------------------------------------
-            # 动态生成雷达图，匹配 AI 提炼的任意维度
+            # 动态生成雷达图 (移动端完美适配版)
             # ------------------------------------------
             radar_dict = profile_data.get("radar_scores", {})
             dimensions = list(radar_dict.keys())
             scores = list(radar_dict.values())
 
-            # 极致容错：如果网络崩溃或模型未按照要求输出 radar_scores
             if not dimensions:
                 dimensions = ["未识别维度A", "未识别维度B", "未识别维度C", "未识别维度D"]
                 scores = [0, 0, 0, 0]
 
             indicator = [{"name": str(dim), "max": 100} for dim in dimensions]
+
             radar_options = {
-                "tooltip": {},
-                "radar": {"indicator": indicator},
+                "tooltip": {
+                    "trigger": "item"
+                },
+                "radar": {
+                    "indicator": indicator,
+                    # 【核心优化 1】将雷达图主体缩小到画板的 55%，给四周的长文字留出绝对安全的空间
+                    "radius": "55%",
+                    "center": ["50%", "50%"],
+                    "axisName": {
+                        # 【核心优化 2】控制移动端字体大小，并强制超出 75px 后自动换行
+                        "fontSize": 12,
+                        "color": "#333",
+                        "width": 75,
+                        "overflow": "break"
+                    }
+                },
                 "series": [{
                     "name": "能力分值",
                     "type": "radar",
                     "data": [{"value": scores, "name": "学生现状"}],
-                    "areaStyle": {"color": "rgba(54, 162, 235, 0.2)"}
+                    "areaStyle": {"color": "rgba(54, 162, 235, 0.2)"},
+                    "lineStyle": {"color": "#36A2EB"},
+                    "itemStyle": {"color": "#36A2EB"}
                 }]
             }
-            st_echarts(options=radar_options, height="400px")
+
+            # 【核心优化 3】高度微调为 350px，防止在手机端占用一整屏导致需频繁滑动，并设置 width="100%"
+            st_echarts(options=radar_options, height="350px", width="100%")
 
         with col2:
             st.subheader("核心差距明细")
