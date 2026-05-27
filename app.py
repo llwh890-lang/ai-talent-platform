@@ -389,7 +389,7 @@ elif system_role == "学生端 (个人成长诊断)":
         col1, col2 = st.columns([1, 1])
         with col1:
             # ------------------------------------------
-            # 动态生成雷达图 (移动端完美适配版)
+            # 动态生成雷达图 (PC与移动端智能双端自适应版)
             # ------------------------------------------
             radar_dict = profile_data.get("radar_scores", {})
             dimensions = list(radar_dict.keys())
@@ -401,35 +401,58 @@ elif system_role == "学生端 (个人成长诊断)":
 
             indicator = [{"name": str(dim), "max": 100} for dim in dimensions]
 
+            # 利用 Echarts 原生的 baseOption 和 media 实现响应式设计
             radar_options = {
-                "tooltip": {
-                    "trigger": "item"
+                "baseOption": {
+                    "tooltip": {"trigger": "item"},
+                    "radar": {
+                        "indicator": indicator,
+                        "center": ["50%", "50%"]
+                    },
+                    "series": [{
+                        "name": "能力分值",
+                        "type": "radar",
+                        "data": [{"value": scores, "name": "学生现状"}],
+                        "areaStyle": {"color": "rgba(54, 162, 235, 0.2)"},
+                        "lineStyle": {"color": "#36A2EB"},
+                        "itemStyle": {"color": "#36A2EB"}
+                    }]
                 },
-                "radar": {
-                    "indicator": indicator,
-                    # 【核心优化 1】将雷达图主体缩小到画板的 55%，给四周的长文字留出绝对安全的空间
-                    "radius": "55%",
-                    "center": ["50%", "50%"],
-                    "axisName": {
-                        # 【核心优化 2】控制移动端字体大小，并强制超出 75px 后自动换行
-                        "fontSize": 12,
-                        "color": "#333",
-                        "width": 75,
-                        "overflow": "break"
+                "media": [
+                    {
+                        "query": {"maxWidth": 550},  # 触发条件：手机屏幕 / 窄容器
+                        "option": {
+                            "radar": {
+                                "radius": "45%",  # 手机端缩小半径防止越界
+                                "axisName": {
+                                    "fontSize": 11,
+                                    "color": "#333",
+                                    "width": 60,
+                                    "overflow": "break",
+                                    "lineHeight": 14
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "query": {"minWidth": 551},  # 触发条件：PC 大屏
+                        "option": {
+                            "radar": {
+                                "radius": "65%",  # PC端恢复饱满大图
+                                "axisName": {
+                                    "fontSize": 14,  # 恢复大号字体
+                                    "color": "#333",
+                                    "width": 120,  # 给足文字舒展空间
+                                    "overflow": "break",
+                                    "lineHeight": 18
+                                }
+                            }
+                        }
                     }
-                },
-                "series": [{
-                    "name": "能力分值",
-                    "type": "radar",
-                    "data": [{"value": scores, "name": "学生现状"}],
-                    "areaStyle": {"color": "rgba(54, 162, 235, 0.2)"},
-                    "lineStyle": {"color": "#36A2EB"},
-                    "itemStyle": {"color": "#36A2EB"}
-                }]
+                ]
             }
 
-            # 【核心优化 3】高度微调为 350px，防止在手机端占用一整屏导致需频繁滑动，并设置 width="100%"
-            st_echarts(options=radar_options, height="350px", width="100%")
+            st_echarts(options=radar_options, height="380px", width="100%")
 
         with col2:
             st.subheader("核心差距明细")
