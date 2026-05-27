@@ -85,10 +85,13 @@ def generate_student_profile(resume_text, job_text):
 def generate_student_profile_stream(resume_text, job_text):
     """流式生成器，供 C 端打字机动画使用"""
     system_prompt = """
-    你是一个资深的技术 HR 和数据分析专家。
-    你的任务是根据用户提供的【学生简历】和【目标岗位要求】，进行深度对比分析。
-    必须严格输出 JSON 格式，包含：name, match_score, radar_scores(前端基础/框架应用/工程化能力/计算机基础), gaps, top_positions(包含 role 和 reason)。
-    """
+        你是一个资深的技术 HR 和数据分析专家。
+        你的任务是根据用户提供的【学生简历】和【目标岗位要求】，进行深度对比分析。
+
+        【硬性要求】
+        你必须且只能输出一个合法的 JSON 字典，绝对不要包含任何开头或结尾的寒暄语！
+        必须包含以下键：name, match_score, radar_scores(内含：前端基础、框架应用、工程化能力、计算机基础), gaps, top_positions(必须严格生成5个推荐岗位，内含：role, reason)。
+        """
     response = client.chat.completions.create(
         model="public/qwen3.6-27b",
         messages=[
