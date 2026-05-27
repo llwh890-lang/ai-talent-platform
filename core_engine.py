@@ -1,13 +1,24 @@
 import os
 import json
+import re
+import streamlit as st
 from dotenv import load_dotenv
 from openai import OpenAI
 
-# 基础配置加载
+# 基础配置加载 (兼容本地和云端)
 load_dotenv()
+
+# 优先使用云端 Secrets，如果找不到再使用本地环境变量
+try:
+    api_key = st.secrets["RUNDAO_API_KEY"]
+    base_url = st.secrets["RUNDAO_BASE_URL"]
+except Exception:
+    api_key = os.getenv("RUNDAO_API_KEY")
+    base_url = os.getenv("RUNDAO_BASE_URL")
+
 client = OpenAI(
-    api_key=os.getenv("RUNDAO_API_KEY"),
-    base_url=os.getenv("RUNDAO_BASE_URL")
+    api_key=api_key,
+    base_url=base_url
 )
 
 
