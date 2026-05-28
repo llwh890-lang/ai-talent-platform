@@ -1,5 +1,5 @@
 """
-Web UI 视图模块 (大厂旗舰版 + 数据闭环引擎)
+Web UI 视图模块 (大厂旗舰版 + 数据闭环引擎 + 流式渲染冲突修复)
 基于 Streamlit 构建的双端交互界面，包含全局动态毛玻璃背景、
 多端响应式 Echarts 雷达图，以及真实的反馈数据持久化落盘机制。
 """
@@ -176,7 +176,6 @@ job_options = list(job_db.keys())
 # ==========================================
 if system_role == "企业端 (人才库与岗位管理)":
 
-    # 统一的高颜值企业级 Header (去Logo极简排版)
     st.markdown(
         """
         <div style="padding-bottom: 15px; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 30px;">
@@ -297,7 +296,6 @@ if system_role == "企业端 (人才库与岗位管理)":
         st.subheader("入职表现与用人反馈 (AI 进化闭环)")
         st.write("企业反馈的真实业务数据将自动落盘，用于持续校准与微调 AI 诊断大模型的评估权重。")
 
-        # 1. 动态新增员工模块
         with st.expander("➕ 录入新员工入职档案"):
             new_emp_name = st.text_input("员工姓名", placeholder="例如：王小明")
             new_emp_time = st.text_input("入职时长", placeholder="例如：入职2周")
@@ -306,12 +304,11 @@ if system_role == "企业端 (人才库与岗位管理)":
                     new_entry = f"{new_emp_name} ({new_emp_time})"
                     if new_entry not in st.session_state.employee_list:
                         st.session_state.employee_list.append(new_entry)
-                        st.success(f"员工 【{new_emp_name}】 档案录入成功！")
+                        st.success(f"✅ 员工 【{new_emp_name}】 档案录入成功！")
                         st.rerun()
                 else:
                     st.warning("请填写完整的员工姓名与时长。")
 
-        # 2. 评价与大模型反哺模块
         col1, col2 = st.columns(2)
         with col1:
             selected_emp = st.selectbox("选择要评估的员工", options=st.session_state.employee_list)
@@ -340,7 +337,7 @@ if system_role == "企业端 (人才库与岗位管理)":
                     with open(feedback_file, "w", encoding="utf-8") as f:
                         json.dump(logs, f, ensure_ascii=False, indent=4)
 
-                    st.success("反馈已加密落盘！系统将在下一次诊断请求时（RAG 检索）自动对齐该特征样本，校准模型权重。")
+                    st.success("✅ 反馈已加密落盘！系统将在下一次诊断请求时自动对齐该特征样本，校准模型权重。")
                 except Exception as e:
                     st.error(f"本地数据写入失败，请检查读写权限: {e}")
 
@@ -359,10 +356,10 @@ elif system_role == "学生端 (个人成长诊断)":
                 extracted_text = extract_text_from_pdf(uploaded_resume)
 
                 if extracted_text == "ERROR_SCANNED_PDF":
-                    st.error("无法提取有效文本，请确保简历是标准的文字版 PDF，而非扫描件。")
+                    st.error("⚠️ 无法提取有效文本，请确保简历是标准的文字版 PDF，而非扫描件。")
                     st.session_state.uploaded_file_name = uploaded_resume.name
                 elif extracted_text == "ERROR_PARSING_FAILED":
-                    st.error("PDF 解析发生未知错误。")
+                    st.error("⚠️ PDF 解析发生未知错误。")
                 elif extracted_text.strip():
                     st.session_state.resume_text = extracted_text
                     st.session_state.uploaded_file_name = uploaded_resume.name
@@ -386,14 +383,12 @@ elif system_role == "学生端 (个人成长诊断)":
 
         analyze_btn = st.button("开始 AI 诊断")
 
-    # 动态判断当前是否处于“诊断结果展示模式”
     is_report_mode = bool(st.session_state.profile_data or analyze_btn)
     title_color = "#1e3a8a" if is_report_mode else "#ffffff"
     subtitle_color = "#0f172a" if is_report_mode else "#e2e8f0"
     border_color = "rgba(0,0,0,0.1)" if is_report_mode else "rgba(255,255,255,0.2)"
     text_shadow = "none" if is_report_mode else "0px 2px 10px rgba(0,0,0,0.8)"
 
-    # 统一的高颜值学生端 Header (支持平滑自适应变色，去Logo)
     st.markdown(
         f"""
         <div style="padding-bottom: 15px; border-bottom: 2px solid {border_color}; margin-bottom: 30px; transition: all 0.5s;">
@@ -404,20 +399,16 @@ elif system_role == "学生端 (个人成长诊断)":
         unsafe_allow_html=True
     )
 
-    # 首页欢迎占位图
     if not is_report_mode:
         st.markdown(
             """
             <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 40vh; width: 100%;">
-                <h1 style="color: #ffffff; font-size: 4.8rem; font-weight: 900; letter-spacing: 0.1em; text-indent: 0.1em; margin: 0; text-shadow: 0px 10px 30px rgba(0,0,0,0.8);">
-                    欢迎使用！
-                </h1>
+                <h1 class="welcome-title">欢迎使用！</h1>
             </div>
             """,
             unsafe_allow_html=True
         )
 
-    # 触发 AI 诊断流程
     if analyze_btn:
         if not resume_input or not job_input:
             st.warning("请填写完整的简历和岗位要求！")
@@ -445,7 +436,6 @@ elif system_role == "学生端 (个人成长诊断)":
                 except Exception as e:
                     status.update(label=f"系统：请求异常 {e}", state="error")
 
-    # 结构化报表展示区
     if st.session_state.profile_data:
         profile_data = st.session_state.profile_data
 
@@ -579,7 +569,7 @@ elif system_role == "学生端 (个人成长诊断)":
 
 
 # ==========================================
-# 终极版：全局动态背景与毛玻璃渲染引擎
+# 终极版：全局动态背景与响应式底层 CSS 注入
 # ==========================================
 bg_url = "https://images.unsplash.com/photo-1639322537228-f710d846310a?q=80&w=2064&auto=format&fit=crop"
 
@@ -590,7 +580,7 @@ else:
     glass_bg = "rgba(15, 23, 42, 0.35)"
     glass_blur = "6px"
 
-# 注入全局 CSS 样式表 (包含强制击穿 iframe)
+# 注入全局 CSS 样式表 (包含彻底修复流式渲染动画冲突的代码)
 st.markdown(
     f"""
     <style>
@@ -609,9 +599,11 @@ st.markdown(
         -webkit-backdrop-filter: blur({glass_blur});
         border-radius: 20px;
         box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.35);
-        transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1); 
+        /* 【致命 Bug 修复】：绝对不能用 all，否则大模型流式输出时高度计算会彻底崩溃！只能过渡背景颜色 */
+        transition: background-color 0.5s ease; 
         margin-top: 2rem;
-        padding: 2rem 3rem !important;
+        padding: 3rem !important;
+        padding-bottom: 5rem !important; /* 强制底部留白，防止贴边 */
     }}
     
     /* 3. 隐藏原本白色的 Header 顶栏，让其透明 */
@@ -619,7 +611,7 @@ st.markdown(
         background-color: transparent !important;
     }}
     
-    /* 4. 侧边栏深度融合：半透明毛玻璃化，消除割裂感 */
+    /* 4. 侧边栏深度融合 */
     [data-testid="stSidebar"] {{
         background-color: rgba(240, 242, 246, 0.65) !important;
         backdrop-filter: blur(15px);
@@ -627,9 +619,39 @@ st.markdown(
         border-right: 1px solid rgba(255, 255, 255, 0.3);
     }}
     
-    /* 5. 强制击穿 iframe 容器的默认白底，实现完美视觉融合 */
+    /* 5. 强制击穿 iframe 容器的默认白底 */
     iframe {{
         background-color: transparent !important;
+    }}
+    
+    /* 6. PC 端欢迎标题样式 */
+    h1.welcome-title {{
+        color: #ffffff !important; 
+        font-size: 4.8rem !important; 
+        font-weight: 900 !important; 
+        letter-spacing: 0.1em !important; 
+        text-indent: 0.1em !important; 
+        margin: 0 !important; 
+        text-shadow: 0px 10px 30px rgba(0,0,0,0.8) !important;
+    }}
+    
+    /* 7. 移动端完美适配响应式设计 */
+    @media (max-width: 768px) {{
+        h1.welcome-title {{
+            font-size: 2.8rem !important; 
+        }}
+        .block-container {{
+            padding: 1.5rem !important; 
+            padding-bottom: 3rem !important;
+        }}
+    }}
+    
+    /* 8. 修复移动端 WebKit 毛玻璃导致超链接不可点击的底层 Bug */
+    a {{
+        position: relative;
+        z-index: 50;
+        pointer-events: auto !important;
+        word-break: break-all;
     }}
     </style>
     """,
