@@ -1,7 +1,7 @@
 """
-Web UI 视图模块
-基于 Streamlit 构建的双端交互界面，负责状态保持 (Session State)、
-PDF 文档解析、数据可视化 (Echarts) 以及多模态文件导出。
+Web UI 视图模块 (大厂旗舰版 + 数据闭环引擎)
+基于 Streamlit 构建的双端交互界面，包含全局动态毛玻璃背景、
+多端响应式 Echarts 雷达图，以及真实的反馈数据持久化落盘机制。
 """
 
 import streamlit as st
@@ -22,7 +22,6 @@ from core_engine import (
     parse_profile_json,
     generate_learning_plan_stream
 )
-
 
 # ==========================================
 # 工具函数定义区 (文件导出与处理)
@@ -110,10 +109,7 @@ def create_word_download(markdown_text):
 
 
 def extract_text_from_pdf(uploaded_file):
-    """
-    解析上传的 PDF 文件。
-    加入空文本与扫描件的拦截机制 (容错处理)。
-    """
+    """解析上传的 PDF 文件，加入空文本与扫描件的拦截机制"""
     try:
         reader = PyPDF2.PdfReader(uploaded_file)
         text = ""
@@ -122,7 +118,6 @@ def extract_text_from_pdf(uploaded_file):
             if page_text:
                 text += page_text + "\n"
 
-        # 防御机制：如果提取文本过短，判定为图片扫描件
         if len(text.strip()) < 50:
             return "ERROR_SCANNED_PDF"
         return text
@@ -131,7 +126,7 @@ def extract_text_from_pdf(uploaded_file):
 
 
 def load_job_models():
-    """读取本地企业岗位 JSON 数据库，若不存在则提供默认托底数据"""
+    """读取本地企业岗位 JSON 数据库"""
     db_path = os.path.join("data", "job_models.json")
     try:
         with open(db_path, "r", encoding="utf-8") as f:
@@ -146,7 +141,7 @@ def load_job_models():
 # ==========================================
 st.set_page_config(page_title="AI 智能人才培养与精准就业平台", layout="wide")
 
-# 初始化全局会话记忆 (Session State)
+# 初始化全局会话记忆
 if "profile_data" not in st.session_state:
     st.session_state.profile_data = None
 if "learning_plan_md" not in st.session_state:
@@ -157,6 +152,13 @@ if "resume_text" not in st.session_state:
     st.session_state.resume_text = "姓名：李四\n专业：软件工程\n技能：学过C语言，对前端完全不懂。"
 if "uploaded_file_name" not in st.session_state:
     st.session_state.uploaded_file_name = None
+
+# 初始化动态员工列表
+if "employee_list" not in st.session_state:
+    st.session_state.employee_list = ["张大海 (入职3个月)", "李雪 (入职1个月)"]
+
+# 全局变量，用于追踪诊断按钮状态
+analyze_btn = False
 
 with st.sidebar:
     st.title("系统控制台")
@@ -173,7 +175,17 @@ job_options = list(job_db.keys())
 # 路由跳转一：企业端 (B端) 视图逻辑
 # ==========================================
 if system_role == "企业端 (人才库与岗位管理)":
-    st.title("企业人才智能管理门户")
+
+    # 统一的高颜值企业级 Header (去Logo极简排版)
+    st.markdown(
+        """
+        <div style="padding-bottom: 15px; border-bottom: 2px solid rgba(0,0,0,0.1); margin-bottom: 30px;">
+            <h2 style="margin: 0; color: #1e3a8a; font-weight: 900; font-size: 2.2rem;">企业人才智能管理门户</h2>
+            <p style="margin: 5px 0 0 0; color: #0f172a; font-size: 1.1rem; font-weight: 800;">—— 基于润道星算大模型服务平台</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
     tab1, tab2, tab3 = st.tabs(["岗位模型库", "智能匹配清单", "用人反馈追踪"])
 
@@ -282,24 +294,61 @@ if system_role == "企业端 (人才库与岗位管理)":
             st.dataframe(st.session_state.batch_talents_df, use_container_width=True, hide_index=True)
 
     with tab3:
-        st.subheader("入职表现与用人反馈")
-        st.write("构建闭环：企业反馈数据将用于持续微调 AI 诊断大模型。")
+        st.subheader("入职表现与用人反馈 (AI 进化闭环)")
+        st.write("企业反馈的真实业务数据将自动落盘，用于持续校准与微调 AI 诊断大模型的评估权重。")
+
+        # 1. 动态新增员工模块
+        with st.expander("➕ 录入新员工入职档案"):
+            new_emp_name = st.text_input("员工姓名", placeholder="例如：王小明")
+            new_emp_time = st.text_input("入职时长", placeholder="例如：入职2周")
+            if st.button("保存员工档案"):
+                if new_emp_name and new_emp_time:
+                    new_entry = f"{new_emp_name} ({new_emp_time})"
+                    if new_entry not in st.session_state.employee_list:
+                        st.session_state.employee_list.append(new_entry)
+                        st.success(f"员工 【{new_emp_name}】 档案录入成功！")
+                        st.rerun()
+                else:
+                    st.warning("请填写完整的员工姓名与时长。")
+
+        # 2. 评价与大模型反哺模块
         col1, col2 = st.columns(2)
         with col1:
-            st.selectbox("选择已入职员工", ["张大海 (入职3个月)", "李雪 (入职1个月)"])
-            st.slider("实际工作表现评分 (1-10分)", 1, 10, 8)
+            selected_emp = st.selectbox("选择要评估的员工", options=st.session_state.employee_list)
+            performance_score = st.slider("实际工作表现评分 (1-10分)", 1, 10, 8)
         with col2:
-            st.text_area("具体反馈 (优点与不足)")
+            feedback_text = st.text_area("具体反馈 (优点与不足，哪些能力被 AI 误判了？)", height=115)
+
         if st.button("提交反馈并反哺大模型"):
-            st.success("反馈已记录！系统已将实际表现与入职前 AI 画像进行比对，模型权重已自动微调。")
+            if not feedback_text.strip():
+                st.warning("请填写具体的反馈内容，以便 AI 学习！")
+            else:
+                feedback_data = {
+                    "employee": selected_emp,
+                    "score": performance_score,
+                    "feedback": feedback_text
+                }
+                feedback_file = os.path.join("data", "feedback_logs.json")
+                try:
+                    os.makedirs("data", exist_ok=True)
+                    logs = []
+                    if os.path.exists(feedback_file):
+                        with open(feedback_file, "r", encoding="utf-8") as f:
+                            logs = json.load(f)
+
+                    logs.append(feedback_data)
+                    with open(feedback_file, "w", encoding="utf-8") as f:
+                        json.dump(logs, f, ensure_ascii=False, indent=4)
+
+                    st.success("反馈已加密落盘！系统将在下一次诊断请求时（RAG 检索）自动对齐该特征样本，校准模型权重。")
+                except Exception as e:
+                    st.error(f"本地数据写入失败，请检查读写权限: {e}")
 
 
 # ==========================================
 # 路由跳转二：学生端 (C端) 视图逻辑
 # ==========================================
 elif system_role == "学生端 (个人成长诊断)":
-
-    st.title("学生成长诊断与路径规划平台")
 
     with st.sidebar:
         st.header("输入数据")
@@ -309,12 +358,11 @@ elif system_role == "学生端 (个人成长诊断)":
             if st.session_state.uploaded_file_name != uploaded_resume.name:
                 extracted_text = extract_text_from_pdf(uploaded_resume)
 
-                # 触发扫描件保护机制
                 if extracted_text == "ERROR_SCANNED_PDF":
-                    st.error("⚠️ 无法提取有效文本，请确保您的简历是标准的文字版 PDF，而非纯图片扫描件。")
+                    st.error("无法提取有效文本，请确保简历是标准的文字版 PDF，而非扫描件。")
                     st.session_state.uploaded_file_name = uploaded_resume.name
                 elif extracted_text == "ERROR_PARSING_FAILED":
-                    st.error("⚠️ PDF 解析发生未知错误。")
+                    st.error("PDF 解析发生未知错误。")
                 elif extracted_text.strip():
                     st.session_state.resume_text = extracted_text
                     st.session_state.uploaded_file_name = uploaded_resume.name
@@ -338,10 +386,34 @@ elif system_role == "学生端 (个人成长诊断)":
 
         analyze_btn = st.button("开始 AI 诊断")
 
+    # 动态判断当前是否处于“诊断结果展示模式”
+    is_report_mode = bool(st.session_state.profile_data or analyze_btn)
+    title_color = "#1e3a8a" if is_report_mode else "#ffffff"
+    subtitle_color = "#0f172a" if is_report_mode else "#e2e8f0"
+    border_color = "rgba(0,0,0,0.1)" if is_report_mode else "rgba(255,255,255,0.2)"
+    text_shadow = "none" if is_report_mode else "0px 2px 10px rgba(0,0,0,0.8)"
+
+    # 统一的高颜值学生端 Header (支持平滑自适应变色，去Logo)
+    st.markdown(
+        f"""
+        <div style="padding-bottom: 15px; border-bottom: 2px solid {border_color}; margin-bottom: 30px; transition: all 0.5s;">
+            <h2 style="margin: 0; color: {title_color}; font-weight: 900; font-size: 2.2rem; text-shadow: {text_shadow}; transition: color 0.5s;">学生成长诊断与路径规划平台</h2>
+            <p style="margin: 5px 0 0 0; color: {subtitle_color}; font-size: 1.1rem; font-weight: 800; text-shadow: {text_shadow}; transition: color 0.5s;">—— 基于润道星算大模型服务平台</p>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
     # 首页欢迎占位图
-    if not st.session_state.profile_data and not analyze_btn:
+    if not is_report_mode:
         st.markdown(
-            "<h1 style='text-align: center; color: #333; font-size: 3.5rem; margin-top: 15vh;'>欢迎使用！</h1>",
+            """
+            <div style="display: flex; flex-direction: column; justify-content: center; align-items: center; height: 40vh; width: 100%;">
+                <h1 style="color: #ffffff; font-size: 4.8rem; font-weight: 900; letter-spacing: 0.1em; text-indent: 0.1em; margin: 0; text-shadow: 0px 10px 30px rgba(0,0,0,0.8);">
+                    欢迎使用！
+                </h1>
+            </div>
+            """,
             unsafe_allow_html=True
         )
 
@@ -380,7 +452,6 @@ elif system_role == "学生端 (个人成长诊断)":
         col_metric, col_title = st.columns([1, 4])
         with col_metric:
             match_score = profile_data.get("match_score", 0)
-            # 如果触发了优雅降级（网络断开），标红显示分数为 0
             color = "normal" if match_score > 0 else "inverse"
             st.metric(label="岗位整体匹配度", value=f"{match_score}%", delta_color=color)
         with col_title:
@@ -388,9 +459,6 @@ elif system_role == "学生端 (个人成长诊断)":
 
         col1, col2 = st.columns([1, 1])
         with col1:
-            # ------------------------------------------
-            # 动态生成雷达图 (PC与移动端智能双端自适应版 - 极致缩放)
-            # ------------------------------------------
             radar_dict = profile_data.get("radar_scores", {})
             dimensions = list(radar_dict.keys())
             scores = list(radar_dict.values())
@@ -401,9 +469,9 @@ elif system_role == "学生端 (个人成长诊断)":
 
             indicator = [{"name": str(dim), "max": 100} for dim in dimensions]
 
-            # 利用 Echarts 原生的 baseOption 和 media 实现响应式设计
             radar_options = {
                 "baseOption": {
+                    "backgroundColor": "transparent",
                     "tooltip": {"trigger": "item"},
                     "radar": {
                         "indicator": indicator,
@@ -420,14 +488,14 @@ elif system_role == "学生端 (个人成长诊断)":
                 },
                 "media": [
                     {
-                        "query": {"maxWidth": 550},  # 触发条件：手机屏幕 / 窄容器
+                        "query": {"maxWidth": 550},
                         "option": {
                             "radar": {
-                                "radius": "38%",  # 【极致压缩】进一步缩小半径到 38%
+                                "radius": "38%",
                                 "axisName": {
-                                    "fontSize": 10,  # 【字号微调】字号缩小到 10px
+                                    "fontSize": 10,
                                     "color": "#333",
-                                    "width": 55,  # 【折行收紧】强制换行宽度压得更紧
+                                    "width": 55,
                                     "overflow": "break",
                                     "lineHeight": 12
                                 }
@@ -435,10 +503,10 @@ elif system_role == "学生端 (个人成长诊断)":
                         }
                     },
                     {
-                        "query": {"minWidth": 551},  # 触发条件：PC 大屏
+                        "query": {"minWidth": 551},
                         "option": {
                             "radar": {
-                                "radius": "65%",  # PC端保持饱满大图
+                                "radius": "65%",
                                 "axisName": {
                                     "fontSize": 14,
                                     "color": "#333",
@@ -508,3 +576,62 @@ elif system_role == "学生端 (个人成长诊断)":
                 file_name=f"{profile_data.get('name', 'student')}_路径规划.docx",
                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             )
+
+
+# ==========================================
+# 终极版：全局动态背景与毛玻璃渲染引擎
+# ==========================================
+bg_url = "https://images.unsplash.com/photo-1639322537228-f710d846310a?q=80&w=2064&auto=format&fit=crop"
+
+if system_role == "企业端 (人才库与岗位管理)" or st.session_state.profile_data or analyze_btn:
+    glass_bg = "rgba(255, 255, 255, 0.92)"
+    glass_blur = "20px"
+else:
+    glass_bg = "rgba(15, 23, 42, 0.35)"
+    glass_blur = "6px"
+
+# 注入全局 CSS 样式表 (包含强制击穿 iframe)
+st.markdown(
+    f"""
+    <style>
+    /* 1. 将 Streamlit 底层铺满全局背景图 */
+    .stApp {{
+        background-image: url('{bg_url}');
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    
+    /* 2. 主区域毛玻璃卡片 */
+    .block-container {{
+        background-color: {glass_bg} !important;
+        backdrop-filter: blur({glass_blur});
+        -webkit-backdrop-filter: blur({glass_blur});
+        border-radius: 20px;
+        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.35);
+        transition: all 0.7s cubic-bezier(0.4, 0, 0.2, 1); 
+        margin-top: 2rem;
+        padding: 2rem 3rem !important;
+    }}
+    
+    /* 3. 隐藏原本白色的 Header 顶栏，让其透明 */
+    header {{
+        background-color: transparent !important;
+    }}
+    
+    /* 4. 侧边栏深度融合：半透明毛玻璃化，消除割裂感 */
+    [data-testid="stSidebar"] {{
+        background-color: rgba(240, 242, 246, 0.65) !important;
+        backdrop-filter: blur(15px);
+        -webkit-backdrop-filter: blur(15px);
+        border-right: 1px solid rgba(255, 255, 255, 0.3);
+    }}
+    
+    /* 5. 强制击穿 iframe 容器的默认白底，实现完美视觉融合 */
+    iframe {{
+        background-color: transparent !important;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
