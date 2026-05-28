@@ -55,3 +55,40 @@
 - **AI / LLM 接入**：OpenAI 兼容接口 (基于润道星算大模型 Qwen3.6-27B)
 - **数据可视化**：Apache ECharts (streamlit-echarts)
 - **文档处理**：PyPDF2, python-docx, pandas, openpyxl
+---
+
+## 🚀 本地快速运行与部署指南
+
+### 1. 克隆项目
+```bash
+git clone [https://github.com/llwh890-lang/ai-talent-platform.git](https://github.com/YourUsername/ai-talent-platform.git)
+cd ai-talent-platform
+```
+### 2. 创建并激活虚拟环境
+```bash
+conda create -n ai-talent python=3.10
+conda activate ai-talent
+```
+### 3. 安装环境依赖
+```bash
+pip install -r requirements.txt
+```
+### 4. 配置核心环境变量
+```Ini, TOML
+RUNDAO_API_KEY="您的API_KEY"
+RUNDAO_BASE_URL="您的模型网关地址"
+```
+### 5. 启动系统
+```bash
+streamlit run app.py
+```
+## 📁 核心目录结构
+```Plaintext
+├── app.py                  # Streamlit 前端视图层与全局状态管理 (多端自适应渲染)
+├── core_engine.py          # LLM 通信引擎、Prompt 构建与防御性 JSON 提取
+├── requirements.txt        # 生产环境依赖清单
+├── .env                    # 环境变量配置文件 (部署时请勿提交至公网)
+└── data/
+    ├── job_models.json     # 企业动态岗位基准库 (持久化层)
+    └── feedback_logs.json  # 业务评价反馈落盘日志 (数据飞轮层)
+```
