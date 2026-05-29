@@ -171,7 +171,6 @@ job_options = list(job_db.keys())
 # 全局背景常量
 BG_URL = "https://images.unsplash.com/photo-1639322537228-f710d846310a?q=80&w=2064&auto=format&fit=crop"
 
-
 def inject_global_css(glass_bg_color, blur_amount):
     """动态注入全局 CSS 样式"""
     st.markdown(
@@ -224,15 +223,10 @@ def inject_global_css(glass_bg_color, blur_amount):
                 padding-bottom: 3rem !important;
             }}
         }}
-
-        /* 8. 修复微信/QQ内置浏览器 X5 内核毛玻璃触控拦截 Bug (终极破甲) */
-        a, .stMarkdown a {{
-            position: relative !important;
-            z-index: 99999 !important; 
+        a {{
+            position: relative;
+            z-index: 50;
             pointer-events: auto !important;
-            touch-action: manipulation !important; 
-            -webkit-transform: translateZ(0) !important; 
-            transform: translateZ(0) !important; 
             word-break: break-all;
         }}
         </style>
@@ -511,7 +505,7 @@ elif system_role == "学生端 (个人成长诊断)":
                         st.session_state.profile_data = result
                         st.session_state.learning_plan_md = None
                         status.update(label="系统：AI 结构化提取完成，正在排版界面...", state="complete", expanded=False)
-                        time.sleep(0.6)
+                        time.sleep(0.2)
                         st.rerun()
                     else:
                         status.update(label="系统：解析失败，大模型输出格式异常。", state="error")
@@ -633,7 +627,7 @@ elif system_role == "学生端 (个人成长诊断)":
                     if full_plan:
                         st.session_state.learning_plan_md = full_plan
                         plan_status.update(label="系统：学习报告编撰完成，正在排版界面...", state="complete", expanded=False)
-                        time.sleep(0.6)
+                        time.sleep(0.2)
                         st.rerun()
                     else:
                         plan_status.update(label="系统：生成失败，请检查模型响应。", state="error")
