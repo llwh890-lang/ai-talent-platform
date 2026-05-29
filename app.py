@@ -171,6 +171,7 @@ job_options = list(job_db.keys())
 # 全局背景常量
 BG_URL = "https://images.unsplash.com/photo-1639322537228-f710d846310a?q=80&w=2064&auto=format&fit=crop"
 
+
 def inject_global_css(glass_bg_color, blur_amount):
     """动态注入全局 CSS 样式"""
     st.markdown(
@@ -223,10 +224,15 @@ def inject_global_css(glass_bg_color, blur_amount):
                 padding-bottom: 3rem !important;
             }}
         }}
-        a {{
-            position: relative;
-            z-index: 50;
+
+        /* 8. 修复微信/QQ内置浏览器 X5 内核毛玻璃触控拦截 Bug (终极破甲) */
+        a, .stMarkdown a {{
+            position: relative !important;
+            z-index: 99999 !important; 
             pointer-events: auto !important;
+            touch-action: manipulation !important; 
+            -webkit-transform: translateZ(0) !important; 
+            transform: translateZ(0) !important; 
             word-break: break-all;
         }}
         </style>
