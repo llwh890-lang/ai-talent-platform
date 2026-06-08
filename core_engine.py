@@ -10,15 +10,23 @@ from openai import OpenAI
 # ==========================================
 load_dotenv()
 
-# 优先读取 Streamlit Cloud 的 Secrets，若不存在则回退读取本地 .env 环境变量
-try:
-    api_key = st.secrets["RUNDAO_API_KEY"]
-    base_url = st.secrets["RUNDAO_BASE_URL"]
-except Exception:
-    api_key = os.getenv("RUNDAO_API_KEY")
-    base_url = os.getenv("RUNDAO_BASE_URL")
+def get_secret(name: str, default: str = "") -> str:
+    try:
+        value = st.secrets.get(name, None)
+    except Exception:
+        value = None
+    if value is None:
+        value = os.getenv(name, default)
+    return str(value).strip().strip('"').strip("'")
 
-# 初始化全局模型客户端
+api_key = get_secret("RUNDAO_API_KEY")
+base_url = get_secret("RUNDAO_BASE_URL").rstrip("/")
+
+if not api_key:
+    st.error("RUNDAO_API_KEY未配置，请检查StreamlitCloud的Secrets。")
+if not base_url:
+    st.error("RUNDAO_BASE_URL未配置，请检查StreamlitCloud的Secrets。")
+
 client = OpenAI(
     api_key=api_key,
     base_url=base_url
@@ -147,8 +155,15 @@ def generate_student_profile_stream(resume_text, job_text):
                 if hasattr(delta, "content") and delta.content is not None:
                     yield delta.content
     except Exception as e:
-        # 优雅降级：网络异常时向前端抛出友好的 JSON 字符串替代报错
-        yield '{"name": "网络超时", "match_score": 0, "radar_scores": {"网络异常": 0}, "gaps": ["服务器连接超时，请重试"], "top_positions": []}'
+            err = f"{type(e).__name__}: {str(e)}"
+            print(f"[RUNDAO_STREAM_ERROR] {err}")
+            yield json.dumps({
+                  "name": "模型接口调用失败",
+                  "match_score": 0,
+                  "radar_scores": {"接口异常": 0},
+                  "gaps": [f"模型接口调用失败：{err}"],
+                  "top_positions": []
+            }, ensure_ascii=False)
 
 
 def get_local_resources():
