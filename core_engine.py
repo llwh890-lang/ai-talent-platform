@@ -10,24 +10,31 @@ from openai import OpenAI
 # ==========================================
 load_dotenv()
 
-# 1. 健壮的密钥读取逻辑 (优先云端 Secrets，退回本地 .env)
+# 1. 安全读取凭证，并在无法读取时抛出明确提示
+api_key = None
+base_url = None
+
 try:
-    # 使用 st.secrets.get 安全读取，避免 KeyError
-    api_key = st.secrets.get("RUNDAO_API_KEY", os.getenv("RUNDAO_API_KEY"))
-    base_url = st.secrets.get("RUNDAO_BASE_URL", os.getenv("RUNDAO_BASE_URL"))
+    if hasattr(st, "secrets"):
+        api_key = st.secrets.get("RUNDAO_API_KEY")
+        base_url = st.secrets.get("RUNDAO_BASE_URL")
 except Exception:
+    pass
+
+if not api_key:
     api_key = os.getenv("RUNDAO_API_KEY")
+if not base_url:
     base_url = os.getenv("RUNDAO_BASE_URL")
 
-# 2. 关键修复：剔除尾部可能存在的斜杠，防止 SDK 拼接出双斜杠 (//v1//chat/completions) 导致网关拦截
+# 2. 移除尾部斜杠，防止部分严格的网关因双斜杠（//chat/completions）而拒绝连接
 if base_url and base_url.endswith("/"):
-    base_url = base_url[:-1]
+    base_url = base_url.rstrip("/")
 
 # 初始化全局模型客户端
 client = OpenAI(
-    api_key=api_key,
-    base_url=base_url,
-    timeout=60.0  # 增加全局超时设置，适应云端海外服务器调用国内 API 的高延迟
+    api_key=api_key if api_key else "MISSING_KEY",
+    base_url=base_url if base_url else "https://api.openai.com/v1",
+    timeout=90.0  # 极力拉长超时时间至 90 秒，应对跨国网络延迟
 )
 
 
