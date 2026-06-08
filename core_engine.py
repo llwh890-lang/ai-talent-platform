@@ -1,9 +1,3 @@
-"""
-Core Engine 模块
-负责处理与底层大模型的通信、提示词工程 (Prompt Engineering) 
-以及 JSON 数据的结构化清洗和防御性解析。
-"""
-
 import os
 import json
 import re
@@ -16,18 +10,24 @@ from openai import OpenAI
 # ==========================================
 load_dotenv()
 
-# 优先读取 Streamlit Cloud 的 Secrets，若不存在则回退读取本地 .env 环境变量
+# 1. 健壮的密钥读取逻辑 (优先云端 Secrets，退回本地 .env)
 try:
-    api_key = st.secrets["RUNDAO_API_KEY"]
-    base_url = st.secrets["RUNDAO_BASE_URL"]
+    # 使用 st.secrets.get 安全读取，避免 KeyError
+    api_key = st.secrets.get("RUNDAO_API_KEY", os.getenv("RUNDAO_API_KEY"))
+    base_url = st.secrets.get("RUNDAO_BASE_URL", os.getenv("RUNDAO_BASE_URL"))
 except Exception:
     api_key = os.getenv("RUNDAO_API_KEY")
     base_url = os.getenv("RUNDAO_BASE_URL")
 
+# 2. 关键修复：剔除尾部可能存在的斜杠，防止 SDK 拼接出双斜杠 (//v1//chat/completions) 导致网关拦截
+if base_url and base_url.endswith("/"):
+    base_url = base_url[:-1]
+
 # 初始化全局模型客户端
 client = OpenAI(
     api_key=api_key,
-    base_url=base_url
+    base_url=base_url,
+    timeout=60.0  # 增加全局超时设置，适应云端海外服务器调用国内 API 的高延迟
 )
 
 
@@ -220,4 +220,4 @@ def generate_learning_plan_stream(gaps, target_job):
                 if hasattr(delta, "content") and delta.content is not None:
                     yield delta.content
     except Exception as e:
-        yield f"\n\n⚠️ **报告生成失败（网络连接异常），请重新点击生成按钮。**\n<!-- 错误详情: {str(e)} -->"
+        yield f"\n\n**报告生成失败（网络连接异常），请重新点击生成按钮。**\n<!-- 错误详情: {str(e)} -->"
