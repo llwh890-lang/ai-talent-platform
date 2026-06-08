@@ -1,5 +1,5 @@
 """
-Web UI 视图模块 (大厂旗舰版 + 数据闭环引擎 + 渲染顺序修复)
+Web UI 视图模块 (大厂旗舰版 + 数据闭环引擎 + 数据脱敏安全防护)
 基于 Streamlit 构建的双端交互界面，包含全局动态毛玻璃背景、
 多端响应式 Echarts 雷达图，以及真实的反馈数据持久化落盘机制。
 """
@@ -12,13 +12,27 @@ import pandas as pd
 import json
 import os
 import time
+import re  # 新增：用于正则脱敏的模块
 from docx import Document
 from docx.shared import Pt
 from docx.oxml.ns import qn
 
 # ==========================================
-# 工具函数定义区 (文件导出与处理)
+# 工具函数定义区 (文件导出与安全处理)
 # ==========================================
+
+def desensitize_text(text):
+    """隐私数据前置脱敏拦截器 (合规风控)"""
+    if not text:
+        return text
+    # 1. 拦截并脱敏 11 位手机号
+    text = re.sub(r'1[3-9]\d{9}', '1***隐私保护***', text)
+    # 2. 拦截并脱敏 18 位二代身份证号
+    text = re.sub(r'[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[0-9Xx]', '***身份证已脱敏***', text)
+    # 3. 拦截并脱敏电子邮箱
+    text = re.sub(r'[a-zA-Z0-9_-]+@[a-zA-Z0-9_-]+(\.[a-zA-Z0-9_-]+)+', '***@***.com', text)
+    return text
+
 
 def set_run_font(run, font_name="Microsoft YaHei", size_pt=11, bold=False):
     """设置 Word 文档输出的中文字体及格式"""
@@ -128,7 +142,7 @@ def load_job_models():
         return {
             "默认岗位开发": "岗位名称：初级后端开发\n能力四维要求：\n1. 算法与数据结构\n2. 数据库设计\n3. 架构能力\n4. 计算机网络"}
 
-# 引入核心业务逻辑 (假设 core_engine.py 在同级目录)
+# 引入核心业务逻辑
 from core_engine import (
     generate_student_profile,
     generate_student_profile_stream,
@@ -323,7 +337,9 @@ if system_role == "企业端 (人才库与岗位管理)":
                         continue
 
                     if resume_text.strip():
-                        profile = generate_student_profile(resume_text, job_text)
+                        # 【核心防线】：B端批量解析也通过脱敏拦截器处理
+                        safe_resume_text = desensitize_text(resume_text)
+                        profile = generate_student_profile(safe_resume_text, job_text)
                         if profile:
                             radar = profile.get("radar_scores", {})
                             advantage = "无数据"
@@ -359,7 +375,7 @@ if system_role == "企业端 (人才库与岗位管理)":
             st.dataframe(st.session_state.batch_talents_df, use_container_width=True, hide_index=True)
 
     with tab3:
-        st.subheader("入职表现与用人反馈 (AI 进化闭环)")
+        st.subheader("入职表现与用人反馈 ")
         st.write("企业反馈的真实业务数据将自动落盘，用于持续校准与微调 AI 诊断大模型的评估权重。")
 
         with st.expander("录入新员工入职档案"):
@@ -427,9 +443,11 @@ elif system_role == "学生端 (个人成长诊断)":
                 elif extracted_text == "ERROR_PARSING_FAILED":
                     st.error("PDF 解析发生未知错误。")
                 elif extracted_text.strip():
-                    st.session_state.resume_text = extracted_text
+                    # 【核心防线】：在前端显示前，立刻执行数据脱敏
+                    safe_extracted_text = desensitize_text(extracted_text)
+                    st.session_state.resume_text = safe_extracted_text
                     st.session_state.uploaded_file_name = uploaded_resume.name
-                    st.success("文档解析成功，文本已自动提取。")
+                    st.success("文档解析成功，隐私数据已前置脱敏保护。")
 
         resume_input = st.text_area("简历内容 (可手动核对与修改)", height=200, value=st.session_state.resume_text)
         st.session_state.resume_text = resume_input
@@ -494,6 +512,7 @@ elif system_role == "学生端 (个人成长诊断)":
                 full_json_str = ""
 
                 try:
+                    # 将已经经过风控的 resume_input 传给大模型
                     for chunk in generate_student_profile_stream(resume_input, job_input):
                         full_json_str += chunk
                         json_placeholder.markdown(f"```json\n{full_json_str} \n```")
