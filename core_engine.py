@@ -10,31 +10,18 @@ from openai import OpenAI
 # ==========================================
 load_dotenv()
 
-# 1. 安全读取凭证，并在无法读取时抛出明确提示
-api_key = None
-base_url = None
-
+# 优先读取 Streamlit Cloud 的 Secrets，若不存在则回退读取本地 .env 环境变量
 try:
-    if hasattr(st, "secrets"):
-        api_key = st.secrets.get("RUNDAO_API_KEY")
-        base_url = st.secrets.get("RUNDAO_BASE_URL")
+    api_key = st.secrets["RUNDAO_API_KEY"]
+    base_url = st.secrets["RUNDAO_BASE_URL"]
 except Exception:
-    pass
-
-if not api_key:
     api_key = os.getenv("RUNDAO_API_KEY")
-if not base_url:
     base_url = os.getenv("RUNDAO_BASE_URL")
-
-# 2. 移除尾部斜杠，防止部分严格的网关因双斜杠（//chat/completions）而拒绝连接
-if base_url and base_url.endswith("/"):
-    base_url = base_url.rstrip("/")
 
 # 初始化全局模型客户端
 client = OpenAI(
-    api_key=api_key if api_key else "MISSING_KEY",
-    base_url=base_url if base_url else "https://api.openai.com/v1",
-    timeout=90.0  # 极力拉长超时时间至 90 秒，应对跨国网络延迟
+    api_key=api_key,
+    base_url=base_url
 )
 
 
