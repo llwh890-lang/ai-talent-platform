@@ -94,4 +94,5 @@ streamlit run app.py
 ```
 ## 平台部署
 部署链接：http://47.97.244.9:8501
-<img width="536" height="88" alt="image" src="https://github.com/user-attachments/assets/4497495e-1823-4fb8-b850-87739d51132d" />
+<img width="477" height="476" alt="image" src="https://github.com/user-attachments/assets/4c917050-e0b7-4064-8557-ee0f4f5ae51d" />
+
