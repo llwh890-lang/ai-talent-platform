@@ -92,3 +92,6 @@ streamlit run app.py
     ├── job_models.json     # 企业动态岗位基准库 (持久化层)
     └── feedback_logs.json  # 业务评价反馈落盘日志 (数据飞轮层)
 ```
+## 平台部署
+部署链接：http://47.97.244.9:8501
+<img width="536" height="88" alt="image" src="https://github.com/user-attachments/assets/4497495e-1823-4fb8-b850-87739d51132d" />
