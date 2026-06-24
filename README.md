@@ -5,7 +5,7 @@
 ![LLM Engine](https://img.shields.io/badge/LLM-润道星算大模型-7B3F00.svg)
 ![License](https://img.shields.io/badge/License-MIT-green.svg)
 
-> **基于「润道星算大模型服务平台」构建的下一代双端 (B2C) 人才精准流转与能力赋能引擎。**
+> **基于大模型服务平台构建的下一代双端 (B2C) 人才精准流转与能力赋能引擎。**
 
 ---
 
